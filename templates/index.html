@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KaStack Labs Assignment Workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-gray-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <header class="border-b border-slate-800 bg-slate-900 px-6 py-4 flex justify-between items-center shadow-lg">
+        <div>
+            <h1 class="text-lg font-bold tracking-tight text-indigo-400">KaStack Labs Chatbot System</h1>
+            <p class="text-xs text-slate-400">AI / ML Engineer Intern Pipeline Platform</p>
+        </div>
+        <div id="statusIndicator" class="px-3 py-1 rounded-full text-xs font-medium bg-amber-950 text-amber-300 border border-amber-700">
+            Engine Standby
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-1 flex flex-col gap-6">
+            <section class="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-md">
+                <h2 class="text-sm font-semibold text-slate-200 mb-3 uppercase tracking-wider">1. Data Ingestion Stream</h2>
+                <form id="uploadForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-2">Upload Conversations CSV</label>
+                        <input type="file" id="csvFile" accept=".csv" required class="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-950 file:text-indigo-300 hover:file:bg-indigo-900 cursor-pointer bg-slate-950 rounded-md border border-slate-700 p-1">
+                    </div>
+                    <button type="submit" id="processBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-md transition duration-150 shadow">
+                        Process Dataset Layers
+                    </button>
+                </form>
+                <div id="loadingStatus" class="hidden mt-3 text-xs text-center text-indigo-400 animate-pulse">
+                    Running chronological sliding semantic vector splits...
+                </div>
+            </section>
+
+            <section class="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-md flex-1 flex flex-col">
+                <h2 class="text-sm font-semibold text-slate-200 mb-3 uppercase tracking-wider">2. System Persona Vector Metrics</h2>
+                <div id="personaBox" class="flex-1 bg-slate-950 p-4 rounded-lg border border-slate-800 overflow-y-auto font-mono text-xs text-emerald-400 whitespace-pre-wrap">
+[System awaiting initial data sync trace...]
+                </div>
+            </section>
+        </div>
+
+        <div class="lg:col-span-2 bg-slate-900 rounded-xl border border-slate-800 shadow-md flex flex-col h-[calc(100vh-13rem)]">
+            <div class="p-4 border-b border-slate-800 bg-slate-900 rounded-t-xl">
+                <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">3. Live Context Verification Chat</h2>
+            </div>
+
+            <div id="chatDisplay" class="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950">
+                <div class="bg-slate-800 text-slate-300 max-w-xl p-3 rounded-xl rounded-tl-none text-xs border border-slate-700 shadow-sm">
+                    System initialized. Upload your conversation dataset to unlock chronological search capability across segmented checkpoints.
+                </div>
+            </div>
+
+            <form id="chatInterface" class="p-4 border-t border-slate-800 bg-slate-900 rounded-b-xl flex gap-3">
+                <input type="text" id="queryText" disabled placeholder="Please run initialization tracking first..." class="flex-1 bg-slate-950 border border-slate-700 rounded-md px-4 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed">
+                <button type="submit" id="queryBtn" disabled class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-md text-xs font-semibold transition duration-150 shadow disabled:opacity-40 disabled:cursor-not-allowed">
+                    Submit Query
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const chatInterface = document.getElementById('chatInterface');
+        const csvFile = document.getElementById('csvFile');
+        const processBtn = document.getElementById('processBtn');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const personaBox = document.getElementById('personaBox');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const queryText = document.getElementById('queryText');
+        const queryBtn = document.getElementById('queryBtn');
+        const chatDisplay = document.getElementById('chatDisplay');
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!csvFile.files[0]) return;
+
+            const payloadData = new FormData();
+            payloadData.append('file', csvFile.files[0]);
+
+            processBtn.disabled = true;
+            loadingStatus.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: payloadData });
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusIndicator.innerText = "Pipeline Synced";
+                    statusIndicator.className = "px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700";
+                    personaBox.innerText = JSON.stringify(result.persona, null, 2);
+                    
+                    queryText.disabled = false;
+                    queryBtn.disabled = false;
+                    queryText.placeholder = "Query habits, personality traits, or communication styles...";
+                } else {
+                    alert("Ingestion pipeline encountered a state fault: " + result.detail);
+                }
+            } catch (err) {
+                alert("Critical network framework transmission failure.");
+            } finally {
+                processBtn.disabled = false;
+                loadingStatus.classList.add('hidden');
+            }
+        });
+
+        chatInterface.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const messageVal = queryText.value.trim();
+            if (!messageVal) return;
+
+            renderMessage(messageVal, 'user');
+            queryText.value = '';
+
+            try {
+                const res = await fetch('/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: messageVal })
+                });
+                const payload = await res.json();
+
+                if (res.ok) {
+                    renderMessage(payload.answer, 'engine');
+                } else {
+                    renderMessage("Query runtime processing error: " + payload.detail, 'engine');
+                }
+            } catch (err) {
+                renderMessage("Unable to reach active server endpoint channels.", 'engine');
+            }
+        });
+
+        function renderMessage(txt, owner) {
+            const wrap = document.createElement('div');
+            if (owner === 'user') {
+                wrap.className = "bg-indigo-600 text-white max-w-xl p-3 rounded-xl rounded-tr-none text-xs self-end shadow-md ml-auto text-right";
+            } else {
+                wrap.className = "bg-slate-800 text-slate-300 max-w-xl p-3 rounded-xl rounded-tl-none text-xs border border-slate-700 shadow-sm mr-auto text-left";
+            }
+            wrap.innerText = txt;
+            chatDisplay.appendChild(wrap);
+            chatDisplay.scrollTop = chatDisplay.scrollHeight;
+        }
+    </script>
+</body>
+</html>
