@@ -7,3 +7,4 @@ sentence-transformers
 chromadb
 openai
 scikit-learn
+python-dotenv

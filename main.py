@@ -1,5 +1,6 @@
 import os
 import json
+import chromadb
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -14,25 +15,39 @@ SYSTEM_STATE = {"persona": None, "vector_db": None, "ready": False}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("--- SERVER STARTING: INITIALIZING ML PIPELINE ---")
-    try:
-        # Dynamically find the absolute path to conversations.csv
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        csv_path = os.path.join(BASE_DIR, "conversations.csv")
+    print("--- SERVER STARTING ---")
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    persona_path = os.path.join(BASE_DIR, "persona_cache.json")
+    db_path = os.path.join(BASE_DIR, "chroma_storage")
+    
+    # SPEED FIX: If cache exists, load it instantly!
+    if os.path.exists(persona_path) and os.path.exists(db_path):
+        print("Found cached data. Skipping ML pipeline. Booting instantly...")
+        with open(persona_path, "r") as f:
+            SYSTEM_STATE["persona"] = json.load(f)
         
-        print(f"Looking for CSV at: {csv_path}")
-        
-        if not os.path.exists(csv_path):
-            print("CRITICAL: conversations.csv is missing from the folder!")
-            return
-            
-        topics, chunks = process_conversation_data(csv_path, similarity_threshold=0.50)
-        SYSTEM_STATE["persona"] = extract_user_persona(topics)
-        SYSTEM_STATE["vector_db"] = build_vector_database(topics, chunks)
+        chroma_client = chromadb.PersistentClient(path="./chroma_storage")
+        SYSTEM_STATE["vector_db"] = chroma_client.get_collection("conversation_insights")
         SYSTEM_STATE["ready"] = True
         print("--- PIPELINE READY ---")
-    except Exception as e:
-        print(f"Initialization Error: {e}")
+    else:
+        print("No cache found. Running ML Pipeline (This will take a minute)...")
+        csv_path = os.path.join(BASE_DIR, "conversations.csv")
+        try:
+            topics, chunks = process_conversation_data(csv_path, similarity_threshold=0.50)
+            
+            # Save Persona to file
+            persona_data = extract_user_persona(topics)
+            with open(persona_path, "w") as f:
+                json.dump(persona_data, f)
+                
+            SYSTEM_STATE["persona"] = persona_data
+            SYSTEM_STATE["vector_db"] = build_vector_database(topics, chunks)
+            SYSTEM_STATE["ready"] = True
+            print("--- PIPELINE READY ---")
+        except Exception as e:
+            print(f"Initialization Error: {e}")
+            
     yield
     print("Shutting down...")
 
