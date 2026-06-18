@@ -27,14 +27,14 @@ SYSTEM_STATE = {
 
 class QueryPayload(BaseModel):
     query: str
-
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard(request: Request):
     """Renders the single-page application dashboard workspace."""
-    return templates.TemplateResponse("index.html", {
-        "request": request, 
-        "ready": SYSTEM_STATE["pipeline_initialized"]
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html", 
+        context={"ready": SYSTEM_STATE["pipeline_initialized"]}
+    )
 
 @app.post("/upload")
 async def handle_csv_upload(file: UploadFile = File(...)):
