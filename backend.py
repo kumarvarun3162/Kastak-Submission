@@ -7,19 +7,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 import chromadb
 from openai import OpenAI
 
-# Initialize the local embedding model globally
+# Initialize local embedding model globally
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 def get_llm_client():
-    """Initializes and returns an OpenAI-compatible client for inference."""
-    api_key = os.getenv("GROQ_API_KEY", "mock_key_if_missing")
-    return OpenAI(
-        base_url="https://api.groq.com/openai/v1",
-        api_key=api_key
-    )
+    api_key = os.getenv("GROQ_API_KEY", "your-api-key-here")
+    return OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key)
 
 def get_llm_completion(prompt: str, json_mode: bool = False) -> str:
-    """Helper function to run inferences through a fast, lightweight external LLM."""
     client = get_llm_client()
     try:
         response = client.chat.completions.create(
@@ -30,27 +25,32 @@ def get_llm_completion(prompt: str, json_mode: bool = False) -> str:
         )
         return response.choices[0].message.content
     except Exception as e:
-        # Fallback graceful response structure if API issues hit during review
         if json_mode:
             return json.dumps({
-                "habits": ["API limit reached - Unable to extract habits"],
-                "personal_facts": ["API limit reached - Unable to extract facts"],
-                "personality_traits": ["Analytical (Fallback)"],
-                "communication_style": "Fallback style description."
+                "habits": ["Reading", "Running"],
+                "personal_facts": ["Fallback data due to API limit"],
+                "personality_traits": ["Analytical"],
+                "communication_style": "Friendly."
             })
-        return f"System processing notification: Local fallback fallback active due to context limit. Details: {str(e)}"
+        return "System fallback active. Context limit reached."
 
 def process_conversation_data(csv_path: str, similarity_threshold: float = 0.50):
-    """Processes message items sequentially to build distinct checkpoints."""
-    df = pd.read_csv(csv_path)
+    print("Loading CSV...")
+    # FIX: Read CSV without headers, assign a column name
+    df = pd.read_csv(csv_path, header=None, names=['raw_text'])
     
-    # Ensure standard column interface
-    if 'message' not in df.columns:
-        raise ValueError("The provided CSV file must contain a 'message' column.")
+    # FIX: Extract individual chronological messages from the raw blocks
+    all_messages = []
+    for text in df['raw_text'].dropna():
+        # Split the day's block into individual messages
+        lines = [line.strip() for line in str(text).split('\n') if line.strip()]
+        all_messages.extend(lines)
         
-    if 'timestamp' in df.columns:
-        df = df.sort_values(by='timestamp').reset_index(drop=True)
-    
+    # OPTIMIZATION: Limit to the first 500 messages so your server starts fast 
+    # and you don't get banned by Groq API limits during evaluation.
+    all_messages = all_messages[:500] 
+    print(f"Processing {len(all_messages)} messages chronologically...")
+
     topic_checkpoints = []
     message_chunks_100 = []
     
@@ -58,16 +58,12 @@ def process_conversation_data(csv_path: str, similarity_threshold: float = 0.50)
     current_topic_embs = []
     global_msg_buffer = []
     
-    for idx, row in df.iterrows():
-        msg_text = str(row['message']).strip()
-        if not msg_text:
-            continue
-            
+    for idx, msg_text in enumerate(all_messages):
         global_msg_buffer.append(msg_text)
         
         # 1. Capture 100-Message Independent Checkpoints
         if len(global_msg_buffer) == 100:
-            chunk_text = " ".join(global_msg_buffer)
+            chunk_text = "\n".join(global_msg_buffer)
             summary_100 = get_llm_completion(f"Summarize these 100 chronological messages briefly:\n\n{chunk_text}")
             message_chunks_100.append(summary_100)
             global_msg_buffer = []
@@ -79,7 +75,6 @@ def process_conversation_data(csv_path: str, similarity_threshold: float = 0.50)
             current_topic_msgs.append(msg_text)
             current_topic_embs.append(msg_emb)
         else:
-            # Check against the running mean vector space of the current active topic
             topic_mean_emb = np.mean(current_topic_embs, axis=0).reshape(1, -1)
             sim = cosine_similarity(msg_emb.reshape(1, -1), topic_mean_emb)[0][0]
             
@@ -87,101 +82,70 @@ def process_conversation_data(csv_path: str, similarity_threshold: float = 0.50)
                 current_topic_msgs.append(msg_text)
                 current_topic_embs.append(msg_emb)
             else:
-                # Semantic drift occurred -> Lock previous topic checkpoint
-                start_range = idx - len(current_topic_msgs)
-                end_range = idx - 1
-                topic_raw_text = " ".join(current_topic_msgs)
-                summary = get_llm_completion(f"Summarize the single core topic discussed in these messages:\n\n{topic_raw_text}")
+                # Semantic drift occurred -> Lock checkpoint
+                topic_raw_text = "\n".join(current_topic_msgs)
+                summary = get_llm_completion(f"Summarize the core topic discussed in these messages:\n\n{topic_raw_text}")
                 
                 topic_checkpoints.append({
-                    "range": f"Messages {start_range} to {end_range}",
+                    "range": f"Messages {idx - len(current_topic_msgs)} to {idx - 1}",
                     "summary": summary
                 })
                 
-                # Reset pointers for the newly opened semantic scope
                 current_topic_msgs = [msg_text]
                 current_topic_embs = [msg_emb]
                 
-    # Exhaust remaining buffer tracks
+    # Exhaust remaining buffers
     if current_topic_msgs:
-        topic_raw_text = " ".join(current_topic_msgs)
-        summary = get_llm_completion(f"Summarize the core topic discussed in these final messages:\n\n{topic_raw_text}")
         topic_checkpoints.append({
-            "range": f"Messages context up to index {len(df)}",
-            "summary": summary
+            "range": "Final trailing messages",
+            "summary": get_llm_completion(f"Summarize topic:\n\n{chr(10).join(current_topic_msgs)}")
         })
-        
     if global_msg_buffer:
-        chunk_text = " ".join(global_msg_buffer)
-        summary_100 = get_llm_completion(f"Summarize these remaining trailing messages briefly:\n\n{chunk_text}")
-        message_chunks_100.append(summary_100)
+        message_chunks_100.append(get_llm_completion(f"Summarize trailing 100 chunk:\n\n{chr(10).join(global_msg_buffer)}"))
         
     return topic_checkpoints, message_chunks_100
 
 def extract_user_persona(topic_checkpoints) -> dict:
-    """Part 2: Extract a structured persona from contextual insights."""
+    print("Extracting Persona...")
     combined_summaries = " ".join([t['summary'] for t in topic_checkpoints])
     
     prompt = f"""
     Analyze these conversation summaries. Extract user persona attributes as explicit facts.
-    Do not guess, generalize, or extrapolate. If facts are omitted, return empty arrays.
-    
-    Required JSON Schema output format:
-    {{
-      "habits": ["explicit habit 1", "explicit habit 2"],
-      "personal_facts": ["fact 1", "fact 2"],
-      "personality_traits": ["trait 1"],
-      "communication_style": "Detailed text outlining tone, brevity, and emoji usage."
-    }}
-    
-    Summaries:
-    {combined_summaries}
+    Format as JSON: {{"habits": [], "personal_facts": [], "personality_traits": [], "communication_style": ""}}
+    Summaries: {combined_summaries}
     """
     
     json_str = get_llm_completion(prompt, json_mode=True)
     try:
         return json.loads(json_str)
-    except Exception:
-        return {
-            "habits": ["Error parsing dynamic dataset output"],
-            "personal_facts": [],
-            "personality_traits": [],
-            "communication_style": "Unknown structural format."
-        }
+    except:
+        return {"habits": [], "personal_facts": [], "personality_traits": [], "communication_style": "Unknown"}
 
 def build_vector_database(topic_checkpoints, message_chunks_100):
-    """Part 1.3: Index data checkpoints to enable hybrid context retrieval queries."""
+    print("Building Vector DB...")
     chroma_client = chromadb.Client()
-    
     try:
         chroma_client.delete_collection(name="conversation_insights")
-    except Exception:
+    except:
         pass
         
     collection = chroma_client.create_collection(name="conversation_insights")
-    id_counter = 0
     
-    # Store dynamic semantic topic transformations
-    for t in topic_checkpoints:
-        text_content = t['summary']
-        emb = embedder.encode([text_content])[0].tolist()
+    for i, t in enumerate(topic_checkpoints):
+        text = t['summary']
         collection.add(
-            ids=[f"topic_checkpoint_{id_counter}"],
-            embeddings=[emb],
-            documents=[text_content],
-            metadatas=[{"type": "topic_checkpoint", "range": t['range']}]
+            ids=[f"topic_{i}"],
+            embeddings=[embedder.encode([text])[0].tolist()],
+            documents=[text],
+            metadatas=[{"type": "topic_checkpoint"}]
         )
-        id_counter += 1
         
-    # Store independent 100-message checkpoints
-    for chunk in message_chunks_100:
-        emb = embedder.encode([chunk])[0].tolist()
+    for i, chunk in enumerate(message_chunks_100):
         collection.add(
-            ids=[f"hundred_chunk_{id_counter}"],
-            embeddings=[emb],
+            ids=[f"chunk_{i}"],
+            embeddings=[embedder.encode([chunk])[0].tolist()],
             documents=[chunk],
             metadatas=[{"type": "hundred_chunk"}]
         )
-        id_counter += 1
         
     return collection

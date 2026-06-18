@@ -3,150 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KaStack Labs Assignment Workspace</title>
+    <title>AI System Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    </style>
 </head>
-<body class="bg-gray-950 text-slate-100 min-h-screen flex flex-col font-sans">
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col font-sans">
 
-    <header class="border-b border-slate-800 bg-slate-900 px-6 py-4 flex justify-between items-center shadow-lg">
-        <div>
-            <h1 class="text-lg font-bold tracking-tight text-indigo-400">KaStack Labs Chatbot System</h1>
-            <p class="text-xs text-slate-400">AI / ML Engineer Intern Pipeline Platform</p>
-        </div>
-        <div id="statusIndicator" class="px-3 py-1 rounded-full text-xs font-medium bg-amber-950 text-amber-300 border border-amber-700">
-            Engine Standby
-        </div>
+    <header class="bg-gray-800 p-4 shadow-md flex justify-between items-center">
+        <h1 class="text-xl font-bold text-blue-400">User Intelligence Agent</h1>
+        <span class="bg-green-900 text-green-300 px-3 py-1 rounded-full text-xs border border-green-600">
+            {% if ready %}System Online{% else %}Initializing...{% endif %}
+        </span>
     </header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-1 flex flex-col gap-6">
-            <section class="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-md">
-                <h2 class="text-sm font-semibold text-slate-200 mb-3 uppercase tracking-wider">1. Data Ingestion Stream</h2>
-                <form id="uploadForm" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-2">Upload Conversations CSV</label>
-                        <input type="file" id="csvFile" accept=".csv" required class="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-950 file:text-indigo-300 hover:file:bg-indigo-900 cursor-pointer bg-slate-950 rounded-md border border-slate-700 p-1">
-                    </div>
-                    <button type="submit" id="processBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-md transition duration-150 shadow">
-                        Process Dataset Layers
-                    </button>
-                </form>
-                <div id="loadingStatus" class="hidden mt-3 text-xs text-center text-indigo-400 animate-pulse">
-                    Running chronological sliding semantic vector splits...
-                </div>
-            </section>
-
-            <section class="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-md flex-1 flex flex-col">
-                <h2 class="text-sm font-semibold text-slate-200 mb-3 uppercase tracking-wider">2. System Persona Vector Metrics</h2>
-                <div id="personaBox" class="flex-1 bg-slate-950 p-4 rounded-lg border border-slate-800 overflow-y-auto font-mono text-xs text-emerald-400 whitespace-pre-wrap">
-[System awaiting initial data sync trace...]
-                </div>
-            </section>
-        </div>
-
-        <div class="lg:col-span-2 bg-slate-900 rounded-xl border border-slate-800 shadow-md flex flex-col h-[calc(100vh-13rem)]">
-            <div class="p-4 border-b border-slate-800 bg-slate-900 rounded-t-xl">
-                <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">3. Live Context Verification Chat</h2>
+    <main class="flex-1 flex overflow-hidden p-4 gap-4 max-w-7xl mx-auto w-full">
+        <aside class="w-1/3 bg-gray-800 rounded-lg shadow border border-gray-700 flex flex-col">
+            <div class="p-3 border-b border-gray-700 bg-gray-900 rounded-t-lg">
+                <h2 class="text-sm font-semibold text-gray-300">Extracted Persona</h2>
             </div>
+            <pre class="p-4 overflow-y-auto text-xs text-green-400 font-mono flex-1">{% if ready %}{{ persona | tojson(indent=2) }}{% else %}Waiting for pipeline...{% endif %}</pre>
+        </aside>
 
-            <div id="chatDisplay" class="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950">
-                <div class="bg-slate-800 text-slate-300 max-w-xl p-3 rounded-xl rounded-tl-none text-xs border border-slate-700 shadow-sm">
-                    System initialized. Upload your conversation dataset to unlock chronological search capability across segmented checkpoints.
+        <section class="flex-1 bg-gray-800 rounded-lg shadow border border-gray-700 flex flex-col">
+            <div class="p-3 border-b border-gray-700 bg-gray-900 rounded-t-lg">
+                <h2 class="text-sm font-semibold text-gray-300">Query Assistant</h2>
+            </div>
+            
+            <div id="chatDisplay" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3">
+                <div class="bg-gray-700 p-3 rounded-lg max-w-[80%] text-sm self-start text-gray-200">
+                    Hello! I have processed the hardcoded conversation dataset. What would you like to know about the user?
                 </div>
             </div>
 
-            <form id="chatInterface" class="p-4 border-t border-slate-800 bg-slate-900 rounded-b-xl flex gap-3">
-                <input type="text" id="queryText" disabled placeholder="Please run initialization tracking first..." class="flex-1 bg-slate-950 border border-slate-700 rounded-md px-4 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed">
-                <button type="submit" id="queryBtn" disabled class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-md text-xs font-semibold transition duration-150 shadow disabled:opacity-40 disabled:cursor-not-allowed">
-                    Submit Query
-                </button>
+            <form id="chatForm" class="p-3 border-t border-gray-700 flex gap-2">
+                <input type="text" id="queryInput" required placeholder="Ask about their habits, traits, etc..." class="flex-1 bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" {% if not ready %}disabled{% endif %}>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-semibold transition" {% if not ready %}disabled{% endif %}>Send</button>
             </form>
-        </div>
+        </section>
     </main>
 
     <script>
-        const uploadForm = document.getElementById('uploadForm');
-        const chatInterface = document.getElementById('chatInterface');
-        const csvFile = document.getElementById('csvFile');
-        const processBtn = document.getElementById('processBtn');
-        const loadingStatus = document.getElementById('loadingStatus');
-        const personaBox = document.getElementById('personaBox');
-        const statusIndicator = document.getElementById('statusIndicator');
-        const queryText = document.getElementById('queryText');
-        const queryBtn = document.getElementById('queryBtn');
-        const chatDisplay = document.getElementById('chatDisplay');
+        const form = document.getElementById('chatForm');
+        const input = document.getElementById('queryInput');
+        const chat = document.getElementById('chatDisplay');
 
-        uploadForm.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!csvFile.files[0]) return;
+            const text = input.value.trim();
+            if(!text) return;
 
-            const payloadData = new FormData();
-            payloadData.append('file', csvFile.files[0]);
-
-            processBtn.disabled = true;
-            loadingStatus.classList.remove('hidden');
-
-            try {
-                const response = await fetch('/upload', { method: 'POST', body: payloadData });
-                const result = await response.json();
-
-                if (response.ok) {
-                    statusIndicator.innerText = "Pipeline Synced";
-                    statusIndicator.className = "px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700";
-                    personaBox.innerText = JSON.stringify(result.persona, null, 2);
-                    
-                    queryText.disabled = false;
-                    queryBtn.disabled = false;
-                    queryText.placeholder = "Query habits, personality traits, or communication styles...";
-                } else {
-                    alert("Ingestion pipeline encountered a state fault: " + result.detail);
-                }
-            } catch (err) {
-                alert("Critical network framework transmission failure.");
-            } finally {
-                processBtn.disabled = false;
-                loadingStatus.classList.add('hidden');
-            }
-        });
-
-        chatInterface.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const messageVal = queryText.value.trim();
-            if (!messageVal) return;
-
-            renderMessage(messageVal, 'user');
-            queryText.value = '';
+            // Render User
+            chat.innerHTML += `<div class="bg-blue-600 p-3 rounded-lg max-w-[80%] text-sm self-end text-white ml-auto">${text}</div>`;
+            input.value = '';
+            chat.scrollTop = chat.scrollHeight;
 
             try {
                 const res = await fetch('/query', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: messageVal })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: text})
                 });
-                const payload = await res.json();
-
-                if (res.ok) {
-                    renderMessage(payload.answer, 'engine');
-                } else {
-                    renderMessage("Query runtime processing error: " + payload.detail, 'engine');
-                }
+                const data = await res.json();
+                chat.innerHTML += `<div class="bg-gray-700 p-3 rounded-lg max-w-[80%] text-sm self-start text-gray-200">${data.answer || data.detail}</div>`;
             } catch (err) {
-                renderMessage("Unable to reach active server endpoint channels.", 'engine');
+                chat.innerHTML += `<div class="bg-red-900 p-3 rounded-lg max-w-[80%] text-sm self-start text-white">Error connecting to server.</div>`;
             }
+            chat.scrollTop = chat.scrollHeight;
         });
-
-        function renderMessage(txt, owner) {
-            const wrap = document.createElement('div');
-            if (owner === 'user') {
-                wrap.className = "bg-indigo-600 text-white max-w-xl p-3 rounded-xl rounded-tr-none text-xs self-end shadow-md ml-auto text-right";
-            } else {
-                wrap.className = "bg-slate-800 text-slate-300 max-w-xl p-3 rounded-xl rounded-tl-none text-xs border border-slate-700 shadow-sm mr-auto text-left";
-            }
-            wrap.innerText = txt;
-            chatDisplay.appendChild(wrap);
-            chatDisplay.scrollTop = chatDisplay.scrollHeight;
-        }
     </script>
 </body>
 </html>
